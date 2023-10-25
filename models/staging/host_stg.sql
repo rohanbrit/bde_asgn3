@@ -42,7 +42,7 @@ transform as (
         replace(host_neighbourhood, 'NaN', 'unknown') as host_neighbourhood,
         -- Valid from date set to 01-01-1900 if it is the earliest entry for the host
         case when dbt_valid_from = (select min(dbt_valid_from) from source where host_id = ext_query.host_id) then '1900-01-01'::timestamp else dbt_valid_from end as dbt_valid_from,
-        -- Every entry is set to be valid upto the next valid from date. For the last entry, the date is set to null
+        -- Every entry for a host is set to be valid upto the next valid from date. For the last entry, the date is set to null
         lead(dbt_valid_from - interval '1 second', 1, null) over (partition by host_id order by dbt_valid_from) as dbt_valid_to
     from source as ext_query
 ),

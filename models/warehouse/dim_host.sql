@@ -11,7 +11,7 @@ with check_host_neighbourhood as
         host_name,
         host_since,
         host_is_superhost,
-        case when host_neighbourhood in (select distinct neighbourhood_name from {{ ref('nsw_lga_suburb_stg') }}) then host_neighbourhood else 'unknown' end as host_neighbourhood
+        case when host_neighbourhood in (select distinct suburb_name from {{ ref('nsw_lga_suburb_stg') }}) then host_neighbourhood else 'unknown' end as host_neighbourhood
     from {{ ref('host_stg') }}
 )
 

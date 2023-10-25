@@ -1,63 +1,44 @@
-select
-	tot_list.property_type,
-	tot_list.room_type,
-	tot_list.accommodates,
-	tot_list.month_year,
-	round(act_list.act_list_cnt::numeric /tot_list.tot_list_cnt::numeric, 4)*100 as act_list_rate,
-	act_list.min_act_list_price,
-	act_list.max_act_list_price,
-	act_list.med_act_list_price,
-	act_list.avg_act_list_price,
-	tot_list.dist_host_cnt,
-	round(superhost.dist_superhost_cnt/tot_list.dist_host_cnt, 2) as superhost_rate,
-	avg_rev_scores_rating,
-	act_list.tot_num_stays,
-	act_list.avg_est_revenue
-from
+with tot_list as
 (
 	select
 		property_type,
 		room_type,
 		accommodates,
 		to_char(listing_date, 'YYYY/MM') as month_year,
-		count(*) as tot_list_cnt,
-		count(distinct host_id)::numeric as dist_host_cnt
-	from warehouse.facts_listings
+		count(*)::numeric as tot_list_cnt,
+		nullif(sum(case when has_availability = 'f' then 1 else 0 end), 0)::numeric as inact_list_cnt,
+        nullif(lag(sum(case when has_availability = 'f' then 1 else 0 end)) over (partition by property_type, room_type, accommodates order by to_char(listing_date, 'YYYY/MM')), 0)::numeric as prior_inact_list_cnt,
+        count(distinct host_id)::numeric as dist_host_cnt
+	from {{ ref('facts_listings') }}
 	group by 
 		property_type,
 		room_type,
 		accommodates,
 		to_char(listing_date, 'YYYY/MM')
-) as tot_list
-join
+), act_list as
 (
 	select
 		property_type,
 		room_type,
 		accommodates,
 		to_char(listing_date, 'YYYY/MM') as month_year,
-		count(*) as act_list_cnt,
-		min(price) as min_act_list_price,
+		count(*)::numeric as act_list_cnt,
+		lag(count(*)) over (partition by property_type, room_type, accommodates order by to_char(listing_date, 'YYYY/MM'))::numeric as prior_act_list_cnt,
+        min(price) as min_act_list_price,
 		max(price) as max_act_list_price,
 		PERCENTILE_CONT(0.5) within group (order by price) as med_act_list_price,
 		round(avg(price), 2) as avg_act_list_price,
 		round(avg(review_scores_rating), 2) as avg_rev_scores_rating,
 		sum(30-availability_30) as tot_num_stays,
 		round(avg((30-availability_30)*price), 2) as avg_est_revenue
-	from warehouse.facts_listings
+	from {{ ref('facts_listings') }}
 	where has_availability = 't'
 	group by
 		property_type,
 		room_type,
 		accommodates,
 		to_char(listing_date, 'YYYY/MM')
-) as act_list
-on
-	tot_list.property_type = act_list.property_type
-	and tot_list.room_type = act_list.room_type
-	and tot_list.accommodates = act_list.accommodates
-	and tot_list.month_year = act_list.month_year
-join
+), superhost as
 (
 	select
 		property_type,
@@ -65,22 +46,46 @@ join
 		accommodates,
 		to_char(listing_date, 'YYYY/MM') as month_year,
 		count(distinct host_id)::numeric as dist_superhost_cnt
-	from warehouse.facts_listings
+	from {{ ref('facts_listings') }}
 	where host_is_superhost = 't'
 	group by
 		property_type,
 		room_type,
 		accommodates,
 		to_char(listing_date, 'YYYY/MM')
-) as superhost
-on
-	tot_list.property_type = superhost.property_type
-	and tot_list.room_type = superhost.room_type
-	and tot_list.accommodates = superhost.accommodates
-	and tot_list.month_year = superhost.month_year
-	
+)
+select
+	tot_list.property_type,
+	tot_list.room_type,
+	tot_list.accommodates,
+	tot_list.month_year,
+	round((act_list.act_list_cnt/tot_list.tot_list_cnt)*100, 2) as act_list_rate,
+	act_list.min_act_list_price,
+	act_list.max_act_list_price,
+	act_list.med_act_list_price,
+	act_list.avg_act_list_price,
+	tot_list.dist_host_cnt,
+	round(superhost.dist_superhost_cnt/tot_list.dist_host_cnt, 2) as superhost_rate,
+	avg_rev_scores_rating,
+	round(((act_list.act_list_cnt-act_list.prior_act_list_cnt)/act_list.prior_act_list_cnt)*100, 2) as prcnt_chng_act_list,
+    round(((tot_list.inact_list_cnt-tot_list.prior_inact_list_cnt)/tot_list.prior_inact_list_cnt)*100, 2) as prcnt_chng_inact_list,
+    act_list.tot_num_stays,
+	act_list.avg_est_revenue
+from tot_list
+	left join act_list
+	on
+		tot_list.property_type = act_list.property_type
+		and tot_list.room_type = act_list.room_type
+		and tot_list.accommodates = act_list.accommodates
+		and tot_list.month_year = act_list.month_year
+	left join superhost
+	on
+		tot_list.property_type = superhost.property_type
+		and tot_list.room_type = superhost.room_type
+		and tot_list.accommodates = superhost.accommodates
+		and tot_list.month_year = superhost.month_year
 order by
 	property_type,
 	room_type,
 	accommodates,
-	month_year;
+	month_year

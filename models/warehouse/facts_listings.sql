@@ -5,15 +5,14 @@
 }}
 
 with check_dimensions as
-
 (
     select
         unique_id,
         listing_id,
         listing_date,
         case when host_id in (select distinct host_id from {{ ref('host_stg') }}) then host_id else 0 end as host_id,
-        case when host_neighbourhood in (select distinct neighbourhood_name from {{ ref('nsw_lga_suburb_stg') }}) then host_neighbourhood else 'unknown' end as host_neighbourhood,
-        case when listing_neighbourhood in (select distinct neighbourhood_name from {{ ref('nsw_lga_suburb_stg') }}) then listing_neighbourhood else 'unknown' end as listing_neighbourhood,
+        case when host_neighbourhood in (select distinct suburb_name from {{ ref('nsw_lga_suburb_stg') }}) then host_neighbourhood else 'unknown' end as host_neighbourhood,
+        case when listing_neighbourhood in (select distinct lga_name from {{ ref('nsw_lga_suburb_stg') }}) then listing_neighbourhood else 'unknown' end as listing_neighbourhood,
         case when property_type in (select distinct property_type from {{ ref('property_stg') }}) then property_type else 'unknown' end as property_type,
         case when room_type in (select distinct room_type from {{ ref('room_stg') }}) then room_type else 'unknown' end as room_type,
         accommodates,
@@ -34,16 +33,15 @@ select
     listing.unique_id as unique_id,
     listing.listing_id as listing_id,
     listing.listing_date as listing_date,
-    listing.host_id as host_id,
+    host.host_id as host_id,
     host.host_name as host_name,
     host.host_since as host_since,
     host.host_is_superhost as host_is_superhost,
-    listing.host_neighbourhood as host_neighbourhood,
+    host_lga.suburb_name as host_neighbourhood,
     host_lga.lga_name as host_neighbourhood_lga,
-    listing.listing_neighbourhood,
-    listing_lga.lga_name as listing_neighbourhood_lga,
-    listing.property_type as property_type,
-    listing.room_type as room_type,
+    listing_lga.lga_name as listing_neighbourhood,
+    property.property_type as property_type,
+    room.room_type as room_type,
     listing.accommodates as accommodates,
     listing.price as price,
     listing.has_availability as has_availability,
@@ -57,5 +55,7 @@ select
     listing.review_scores_value as review_scores_value
 from check_dimensions listing
 left join {{ ref('host_stg') }} as host on listing.host_id = host.host_id and listing.listing_date::timestamp between host.dbt_valid_from and coalesce(host.dbt_valid_to, '9999-12-31'::timestamp)
-left join {{ ref('nsw_lga_suburb_stg')}} as host_lga on listing.host_neighbourhood = host_lga.neighbourhood_name
-left join {{ ref('nsw_lga_suburb_stg')}} as listing_lga on listing.listing_neighbourhood = listing_lga.neighbourhood_name
+left join {{ ref('nsw_lga_suburb_stg')}} as host_lga on listing.host_neighbourhood = host_lga.suburb_name
+left join {{ ref('nsw_lga_stg')}} as listing_lga on listing.listing_neighbourhood = listing_lga.lga_name
+left join {{ ref('property_stg') }} as property on listing.property_type = property.property_type and listing.listing_date::timestamp between property.dbt_valid_from and coalesce(property.dbt_valid_to, '9999-12-31'::timestamp)
+left join {{ ref('room_stg') }} as room on listing.room_type = room.room_type and listing.listing_date::timestamp between room.dbt_valid_from and coalesce(room.dbt_valid_to, '9999-12-31'::timestamp)
