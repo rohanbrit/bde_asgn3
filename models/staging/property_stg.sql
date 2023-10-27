@@ -1,6 +1,6 @@
 {{
     config(
-        unique_key='property_id'
+        unique_key='property_type'
     )
 }}
 
@@ -8,19 +8,15 @@ with
 
 transform  as (
     select
-        row_number() over() as property_id,
         property_type,
-        min(dbt_valid_from) as dbt_valid_from,
-        null::timestamp as dbt_valid_to
+        dbt_valid_from,
+        dbt_valid_to
     from
         {{ ref('property_snapshot') }}
-    group by
-        property_type
 ),
 
 unknown as (
     select
-        0 as property_id,
         'unknown' as property_type,
         '1900-01-01'::timestamp  as dbt_valid_from,
         null::timestamp as dbt_valid_to

@@ -9,6 +9,6 @@
         )
     }}
 
-select distinct property_type, to_timestamp(scraped_date, 'YYYY-MM-DD') as scraped_date from {{ source('raw', 'listings') }}
+select distinct property_type, scraped_date::timestamp as scraped_date from {{ source('raw', 'listings') }}
 
 {% endsnapshot %}

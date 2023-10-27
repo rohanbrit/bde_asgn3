@@ -1,6 +1,6 @@
 {{
     config(
-        unique_key='room_id'
+        unique_key='room_type'
     )
 }}
 

@@ -19,7 +19,7 @@ with tot_list as
         lag(count(*)) over (partition by listing_neighbourhood order by to_char(listing_date, 'YYYY/MM'))::numeric as prior_act_list_cnt,
         min(price) as min_act_list_price,
         max(price) as max_act_list_price,
-        PERCENTILE_CONT(0.5) within group (order by price) as med_act_list_price,
+        percentile_disc(0.5) within group (order by price) as med_act_list_price,
         round(avg(price), 2) as avg_act_list_price,
         round(avg(review_scores_rating), 2) as avg_rev_scores_rating,
         sum(30-availability_30) as tot_num_stays,

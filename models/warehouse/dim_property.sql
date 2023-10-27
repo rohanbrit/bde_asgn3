@@ -1,6 +1,6 @@
 {{
     config(
-        unique_key='property_id'
+        unique_key='property_type'
     )
 }}
 
