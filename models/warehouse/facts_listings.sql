@@ -37,9 +37,11 @@ select
     host.host_name as host_name,
     host.host_since as host_since,
     host.host_is_superhost as host_is_superhost,
-    host_lga.suburb_name as host_neighbourhood,
-    host_lga.lga_name as host_neighbourhood_lga,
+    host_suburb.suburb_name as host_neighbourhood,
+    host_lga.lga_code as host_neighbourhood_lga_code,
+    host_lga.lga_name as host_neighbourhood_lga_name,
     listing_lga.lga_name as listing_neighbourhood,
+    listing_lga.lga_code as listing_neighbourhood_lga_code,
     property.property_type as property_type,
     room.room_type as room_type,
     listing.accommodates as accommodates,
@@ -54,8 +56,9 @@ select
     listing.review_scores_communication as review_scores_communication,
     listing.review_scores_value as review_scores_value
 from check_dimensions listing
-left join {{ ref('host_stg') }} as host on listing.host_id = host.host_id and listing.listing_date::timestamp between host.dbt_valid_from and coalesce(host.dbt_valid_to, '9999-12-31'::timestamp)
-left join {{ ref('nsw_lga_suburb_stg')}} as host_lga on listing.host_neighbourhood = host_lga.suburb_name
+left join {{ ref('host_stg') }} as host on listing.host_id = host.host_id and listing.listing_date::timestamp >= host.dbt_valid_from and listing.listing_date::timestamp < coalesce(host.dbt_valid_to, '9999-12-31'::timestamp)
+left join {{ ref('nsw_lga_suburb_stg')}} as host_suburb on listing.host_neighbourhood = host_suburb.suburb_name
+left join {{ ref('nsw_lga_stg')}} as host_lga on host_suburb.lga_name = host_lga.lga_name
 left join {{ ref('nsw_lga_stg')}} as listing_lga on listing.listing_neighbourhood = listing_lga.lga_name
-left join {{ ref('property_stg') }} as property on listing.property_type = property.property_type and listing.listing_date::timestamp between property.dbt_valid_from and coalesce(property.dbt_valid_to, '9999-12-31'::timestamp)
-left join {{ ref('room_stg') }} as room on listing.room_type = room.room_type and listing.listing_date::timestamp between room.dbt_valid_from and coalesce(room.dbt_valid_to, '9999-12-31'::timestamp)
+left join {{ ref('property_stg') }} as property on listing.property_type = property.property_type and listing.listing_date::timestamp >= property.dbt_valid_from and listing.listing_date::timestamp < coalesce(property.dbt_valid_to, '9999-12-31'::timestamp)
+left join {{ ref('room_stg') }} as room on listing.room_type = room.room_type and listing.listing_date::timestamp >= room.dbt_valid_from and listing.listing_date::timestamp < coalesce(room.dbt_valid_to, '9999-12-31'::timestamp)
